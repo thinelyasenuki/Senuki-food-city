@@ -1,0 +1,185 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senuki Food City Chatbot</title>
+    <style>
+        #chatbot {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            height: 400px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #chatbot-header {
+            background-color: #28a745;
+            color: white;
+            padding: 10px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        #chatbot-body {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: Arial, sans-serif;
+        }
+        #chatbot-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+        #user-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 5px;
+        }
+        #send-btn {
+            padding: 8px 12px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #send-btn:hover {
+            background-color: #218838;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #d4edda;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #f8f9fa;
+            margin-right: 20%;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatbot">
+        <div id="chatbot-header">Senuki Food City Chatbot</div>
+        <div id="chatbot-body">
+            <div class="bot-message">Welcome to Senuki Food City! How can I help you today? Type 'menu', 'order', 'hours', or 'contact'.</div>
+        </div>
+        <div id="chatbot-input">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const responses = {
+            menu: "Our menu includes: \n1. Pizza Margherita - $10\n2. Grilled Chicken Sandwich - $8\n3. Veggie Salad - $6\n4. Mango Smoothie - $5\nType 'order' to place an order!",
+            order: "Please type the item name and quantity (e.g., 'Pizza Margherita 2').",
+            hours: "We are open from 10 AM to 10 PM, Monday to Sunday.",
+            contact: "Contact us at: info@senukifoodcity.com or call (123) 456-7890.",
+            default: "Sorry, I didn't understand that. Please type 'menu', 'order', 'hours', or 'contact'."
+        };
+
+        const chatbotBody = document.getElementById('chatbot-body');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function addMessage(message, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = isUser ? 'message user-message' : 'message bot-message';
+            messageDiv.textContent = message;
+            chatbotBody.appendChild(messageDiv);
+            chatbotBody.scrollTop = chatbotBody.scrollHeight;
+        }
+
+        function processInput(input) {
+            const cleanInput = input.toLowerCase().trim();
+            let response;
+
+            if (cleanInput === 'menu') {
+                response = responses.menu;
+            } else if (cleanInput === 'order') {
+                response = responses.order;
+            } else if (cleanInput === 'hours') {
+                response = responses.hours;
+            } else if (cleanInput === 'contact') {
+                response = responses.contact;
+            } else if (cleanInput.includes('pizza') || cleanInput.includes('sandwich') || cleanInput.includes('salad') || cleanInput.includes('smoothie')) {
+                response = `Order confirmed: ${input}. We'll process it soon! Anything else? Type 'menu', 'order', 'hours', or 'contact'.`;
+            } else {
+                response = responses.default;
+            }
+
+            addMessage(response, false);
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const input = userInput.value;
+            if (input) {
+                addMessage(input, true);
+                processInput(input);
+                userInput.value = '';
+            }
+        });
+
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && userInput.value) {
+                addMessage(userInput.value, true);
+                processInput(userInput.value);
+                userInput.value = '';
+            }
+        });
+    </script>
+</body>
+</html>
